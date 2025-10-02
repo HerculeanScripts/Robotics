@@ -11,6 +11,10 @@ pros::MotorGroup rightMotors({-20, 19,18}, pros::MotorGearset::blue); // right m
 pros::Motor firstStage(14, pros::MotorGearset::blue);
 pros::Motor upperIntake(2, pros::MotorGearset::blue);
 
+// pnaumatics
+pros::adi::DigitalOut tongue('B');
+pros::adi::DigitalOut wings('C');
+
 // drivetrain settings
 lemlib::Drivetrain drivetrain(&leftMotors, // left motor group
                               &rightMotors, // right motor group
@@ -34,28 +38,28 @@ lemlib::OdomSensors sensors(&vertical_tracking_wheel, // vertical tracking wheel
 );
 
 // lateral PID controller
-lemlib::ControllerSettings lateral_controller(10, // proportional gain (kP)
+ lemlib::ControllerSettings lateral_controller(7, // proportional gain (kP)
                                               0, // integral gain (kI)
-                                              3, // derivative gain (kD)
-                                              3, // anti windup
-                                              1, // small error range, in inches
-                                              100, // small error range timeout, in milliseconds
-                                              3, // large error range, in inches
-                                              500, // large error range timeout, in milliseconds
-                                              1 // maximum acceleration (slew)
+                                              5, // derivative gain (kD)
+                                              0, // anti windup
+                                              0, // small error range, in inches
+                                              0, // small error range timeout, in milliseconds
+                                              0, // large error range, in inches
+                                              0, // large error range timeout, in milliseconds
+                                            10 // maximum acceleration (slew)
 );
 
 // angular PID controller
 //tried 6.6 and greater and none worked 
 //6.5 40 --to within +-0.2 degrees @90 degree clocwise turn
-lemlib::ControllerSettings angular_controller(6.5, // proportional gain (kP)
+lemlib::ControllerSettings angular_controller(5, // proportional gaisn (kPs)
                                               0, // integral gain (kI)
-                                              40, // derivative gain (kD)
-                                              0, // anti windup
-                                              0, // small error range, in degrees
-                                              0, // small error range timeout, in milliseconds
-                                              0, // large error range, in degrees
-                                              0, // large error range timeout, in milliseconds
+                                              46, // derivative gain (kD)
+                                              3, // anti windup
+                                              1, // small error range, in degrees
+                                              100, // small error range timeout, in milliseconds
+                                              3, // large error range, in degrees
+                                              500, // large error range timeout, in milliseconds
                                               0 // maximum acceleration (slew)
 );
 
@@ -67,10 +71,6 @@ lemlib::Chassis chassis(drivetrain, // drivetrain settings
 );
 
 void initialize() {
-    // set position to x:0, y:0, heading:0
-    chassis.setPose(0, 0, 0);
-    imu1.reset();
-
     pros::lcd::initialize(); // initialize brain screen
     chassis.calibrate(); // calibrate sensors
     // print position to brain screen
@@ -89,8 +89,10 @@ void initialize() {
 /* 
     0 - lateral pid test
     1 - angular pid test
+    2 - simple match auto - aneek make
+    3 - skills
 */
-int chosenAuton = 0;
+int chosenAuton = 2;
 
 void autonomous() {
     switch(chosenAuton){
@@ -112,10 +114,52 @@ void autonomous() {
             // end
             chassis.waitUntilDone();
             break;
+        // simple match auto - aneek makes
+        case 2:
+            break;
+        // skills
+        case 3:
+            // intake first blocks
+            chassis.moveToPoint(0, 23, 1000);
+            chassis.waitUntilDone();
+            chassis.turnToHeading(90, 750);
+            firstStage.move(127);
+            chassis.waitUntilDone();
+            chassis.moveToPoint(17, 22, 1500, {.maxSpeed = 30});
+            chassis.waitUntilDone();
+
+            // score them on bottom goal
+            chassis.turnToHeading(-45, 750);
+            chassis.waitUntilDone();
+            chassis.moveToPoint(5, 36, 1000);
+            chassis.waitUntilDone();
+            firstStage.move(-127);
+            pros::delay(2000);
+            chassis.moveToPoint(15, 20, 1000, {.forwards = false});
+            chassis.waitUntilDone();
+
+            // descore and score
+            chassis.turnToHeading(135, 750);
+            chassis.waitUntilDone();
+            chassis.moveToPoint(41, 3, 2000);
+            chassis.waitUntilDone();
+            tongue.set_value(true);
+            chassis.turnToHeading(180, 750);
+            chassis.waitUntilDone();
+            chassis.moveToPoint(41, -10, 1000);
+            chassis.waitUntilDone();
+            pros::delay(1000);
+            chassis.moveToPoint(41, 20, 1000);
+            chassis.waitUntilDone();
+            upperIntake.move(-127);
+
+            break;
     }
 }
 
 void opcontrol() {
+    bool tongueOut = false;
+
     // loop forever
     while (true) {
         // Exponential drive control
@@ -148,6 +192,12 @@ void opcontrol() {
 		} else { // stop both
 			firstStage.move(0);
 			upperIntake.move(0);
+		}
+
+        if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_A)) {
+			tongueOut = !tongueOut;
+			pros::delay(250);
+			tongue.set_value(tongueOut);
 		}
 
         // delay to save resources
