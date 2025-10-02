@@ -2,12 +2,18 @@
 #include "pros/motors.hpp"
 #include "lemlib/api.hpp" // IWYU pragma: keep
 
-pros::MotorGroup left_motors({11 , -12, -13}, pros::MotorGearset::blue); // left motors on ports 1, 2, 3
-pros::MotorGroup right_motors({-20, 19,18}, pros::MotorGearset::blue); // right motors on ports 4, 5, 6
+pros::Controller controller(pros::E_CONTROLLER_MASTER);
+
+pros::MotorGroup leftMotors({11 , -12, -13}, pros::MotorGearset::blue); // left motors on ports 1, 2, 3
+pros::MotorGroup rightMotors({-20, 19,18}, pros::MotorGearset::blue); // right motors on ports 4, 5, 6
+
+// other motors
+pros::Motor firstStage(14, pros::MotorGearset::blue);
+pros::Motor upperIntake(2, pros::MotorGearset::blue);
 
 // drivetrain settings
-lemlib::Drivetrain drivetrain(&left_motors, // left motor group
-                              &right_motors, // right motor group
+lemlib::Drivetrain drivetrain(&leftMotors, // left motor group
+                              &rightMotors, // right motor group
                               11, // 10 inch track width
                               lemlib::Omniwheel::NEW_275, // using new 4" omnis
                               450, // drivetrain rpm is 360
@@ -26,22 +32,25 @@ lemlib::OdomSensors sensors(&vertical_tracking_wheel, // vertical tracking wheel
                             nullptr, // horizontal tracking wheel 2, set to nullptr as we don't have a second one
                             &imu1 // inertial sensor
 );
+
 // lateral PID controller
-lemlib::ControllerSettings lateral_controller(10, // proportional gain (kP)
+ lemlib::ControllerSettings lateral_controller(7, // proportional gain (kP)
                                               0, // integral gain (kI)
-                                              3, // derivative gain (kD)
-                                              3, // anti windup
-                                              1, // small error range, in inches
-                                              100, // small error range timeout, in milliseconds
-                                              3, // large error range, in inches
-                                              500, // large error range timeout, in milliseconds
-                                              20 // maximum acceleration (slew)
+                                              5, // derivative gain (kD)
+                                              0, // anti windup
+                                              0, // small error range, in inches
+                                              0, // small error range timeout, in milliseconds
+                                              0, // large error range, in inches
+                                              0, // large error range timeout, in milliseconds
+                                            10 // maximum acceleration (slew)
 );
 
 // angular PID controller
-lemlib::ControllerSettings angular_controller(2, // proportional gain (kP)
+//tried 6.6 and greater and none worked 
+//6.5 40 --to within +-0.2 degrees @90 degree clocwise turn
+lemlib::ControllerSettings angular_controller(5, // proportional gaisn (kPs)
                                               0, // integral gain (kI)
-                        10, // derivative gain (kD)
+                                              46, // derivative gain (kD)
                                               3, // anti windup
                                               1, // small error range, in degrees
                                               100, // small error range timeout, in milliseconds
@@ -49,12 +58,14 @@ lemlib::ControllerSettings angular_controller(2, // proportional gain (kP)
                                               500, // large error range timeout, in milliseconds
                                               0 // maximum acceleration (slew)
 );
+
 // create the chassis
 lemlib::Chassis chassis(drivetrain, // drivetrain settings
                         lateral_controller, // lateral PID settings
                         angular_controller, // angular PID settings
                         sensors // odometry sensors
 );
+
 void initialize() {
     pros::lcd::initialize(); // initialize brain screen
     chassis.calibrate(); // calibrate sensors
@@ -70,17 +81,86 @@ void initialize() {
         }
     });
 }
-pros::Controller controller(pros::E_CONTROLLER_MASTER);
+
+/* 
+    0 - lateral pid test
+    1 - angular pid test
+    2 - skills
+*/
+int chosenAuton = 2;
+
+void autonomous() {
+    switch(chosenAuton){
+		// lateral pid test
+        case 0:
+            chassis.moveToPoint(0, 20, 2000);
+            chassis.waitUntilDone();
+            chassis.moveToPoint(0, 0, 2000, {.forwards = false});
+
+            // end
+            chassis.waitUntilDone();
+            break;
+        // angular pid test
+        case 1:
+            chassis.turnToHeading(90, 2000);
+            chassis.waitUntilDone();
+            chassis.turnToHeading(0, 2000);
+
+            // end
+            chassis.waitUntilDone();
+            break;
+        // skills
+        case 2:
+            // intake first blocks
+            chassis.moveToPoint(0, 20, 2000);
+            chassis.waitUntilDone();
+            chassis.turnToHeading(90, 750);
+            chassis.waitUntilDone();
+            firstStage.move(127);
+            chassis.moveToPoint(20, 20, 2000, {.maxSpeed = 90});
+            chassis.waitUntilDone();
+
+            // descore and score
+            chassis.turnToHeading(135, 750);
+
+            break;
+    }
+}
 
 void opcontrol() {
     // loop forever
     while (true) {
-        // get left y and right x positions
+        // Exponential drive control
         int leftY = controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
-        int rightX = controller.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X);
+        int rightX = (controller.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X))/1.2;
 
-        // move the robot
-        chassis.arcade(leftY, rightX);
+		double cubedLeftY = (leftY * leftY * leftY);
+		double cubedRightX = (rightX * rightX * rightX);
+
+		double expY = (cubedLeftY/20000);
+		double expX = (cubedRightX/20000);
+
+		double expL = (leftY + rightX);
+		double expR = (leftY - rightX);
+
+		leftMotors.move(expL);
+        rightMotors.move(expR);
+
+		// intake
+		if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_R1)) { // score on high goal
+			firstStage.move(127);
+			upperIntake.move(-127);
+		} else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_L1)) { // score on mid goal
+			firstStage.move(127);
+			upperIntake.move(127);
+		}  else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_R2)) { // first stage only intake
+			firstStage.move(127);
+		} else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_L2)) { // first stage only extake
+			firstStage.move(-127);
+		} else { // stop both
+			firstStage.move(0);
+			upperIntake.move(0);
+		}
 
         // delay to save resources
         pros::delay(25);
