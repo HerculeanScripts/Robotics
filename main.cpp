@@ -1,12 +1,13 @@
 #include "main.h"
+#include "pros/misc.h"
 #include "pros/motors.hpp"
 #include "lemlib/api.hpp" // IWYU pragma: keep
 
 pros::Controller controller(pros::E_CONTROLLER_MASTER);
 
-pros::MotorGroup leftMotors({11 , -12, -13}, pros::MotorGearset::blue); // left motors on ports 1, 2, 3
+pros::MotorGroup leftMotors({11 , -15, -13}, pros::MotorGearset::blue); // left motors on ports 1, 2, 3
 pros::MotorGroup rightMotors({-20, 19,18}, pros::MotorGearset::blue); // right motors on ports 4, 5, 6
-
+//first = front
 // other motors
 pros::Motor firstStage(14, pros::MotorGearset::blue);
 pros::Motor upperIntake(2, pros::MotorGearset::blue);
@@ -27,7 +28,7 @@ lemlib::Drivetrain drivetrain(&leftMotors, // left motor group
 pros::Imu imu1(3);
 pros::Imu imu2(4);
 // create a v5 rotation sensor on port 1
-pros::Rotation vertical_encoder(-6);
+pros::Rotation vertical_encoder(-10);
 // horizontal tracking wheel
 lemlib::TrackingWheel vertical_tracking_wheel(&vertical_encoder, lemlib::Omniwheel::NEW_275,0);
 lemlib::OdomSensors sensors(&vertical_tracking_wheel, // vertical tracking wheel 1, set to null
@@ -89,10 +90,13 @@ void initialize() {
 /* 
     0 - lateral pid test
     1 - angular pid test
-    2 - simple match auto - aneek make
-    3 - skills
+    2 - 
+    3 - old skills (dont use)
+    4 - left match
+    5 - skills
+    6 - right match
 */
-int chosenAuton = 2;
+int chosenAuton = 7;
 
 void autonomous() {
     switch(chosenAuton){
@@ -117,7 +121,7 @@ void autonomous() {
         // simple match auto - aneek makes
         case 2:
             break;
-        // skills
+        
         case 3:
             // intake first blocks
             chassis.moveToPoint(0, 23, 1000);
@@ -154,11 +158,252 @@ void autonomous() {
             upperIntake.move(-127);
 
             break;
+        case 4:
+            chassis.setPose(0,0,0);
+            chassis.moveToPoint(0, 38, 2000, {.maxSpeed = 70});
+            chassis.turnToHeading(-90, 1000, {.maxSpeed = 80});
+            
+            tongue.set_value(true);
+            pros::delay(1250);
+            firstStage.move(127);
+            chassis.moveToPoint(-12, 38, 1100,{.maxSpeed = 50});
+            chassis.turnToHeading(-90, 500);
+            chassis.moveToPoint(30, 40, 1000,{.forwards = false, .maxSpeed = 90});
+            chassis.waitUntilDone();
+            upperIntake.move(-127);
+            pros::delay(2500);
+            upperIntake.move(0);
+            chassis.waitUntilDone();
+            tongue.set_value(false);
+            chassis.moveToPoint(0, 40, 1000,{.maxSpeed = 60});/*
+            chassis.moveToPoint(30, 40, 1000,{.forwards = false, .maxSpeed = 90});*/
+            chassis.turnToHeading(133, 1000,{.maxSpeed = 80});
+            chassis.moveToPoint(28, 13, 1400,{.maxSpeed = 60});
+            chassis.waitUntilDone();
+            tongue.set_value(true);
+            chassis.turnToHeading(-47, 800,{.maxSpeed = 70});
+            chassis.moveToPoint(37, 5, 1250, {.forwards = false, .maxSpeed = 50});
+            chassis.turnToHeading(-54, 200);
+            chassis.waitUntilDone();
+            upperIntake.move(-70);
+            break;
+
+        case 5://prepare to collect from holder
+            chassis.setPose(0,0,0);
+            chassis.moveToPoint(0, 39, 1500, {.maxSpeed = 70});
+            chassis.turnToHeading(-90, 500, {.maxSpeed = 80});
+            tongue.set_value(true);
+            pros::delay(500);
+            //collect balls
+            firstStage.move(127);
+            chassis.moveToPoint(-10.3, 39, 2000,{.maxSpeed = 50});
+            chassis.turnToHeading(-90, 500);
+            chassis.waitUntilDone();
+            firstStage.move(0);
+            //dump balls
+            chassis.moveToPoint(25, 40, 1000,{.forwards = false, .maxSpeed = 80});
+            chassis.waitUntilDone();
+            firstStage.move(127);
+            upperIntake.move(-127);
+            pros::delay(1000);
+            firstStage.move(-127);
+            pros::delay(250);
+            firstStage.move(127);
+            pros::delay(2000);
+            chassis.waitUntilDone();
+            tongue.set_value(false);
+            upperIntake.move(0);
+            //pick up 2nd batch
+            chassis.moveToPoint(0, 40, 1000,{.maxSpeed = 70});
+            chassis.turnToHeading(133, 500,{.maxSpeed = 80});
+            chassis.moveToPoint(25, 15, 1400,{.maxSpeed = 60});
+            chassis.waitUntilDone();
+            tongue.set_value(true); 
+            pros::delay(500);
+            //dump 2nd batch
+            firstStage.move(0);
+            chassis.moveToPoint(0, 44, 1000,{.forwards = false, .maxSpeed = 70});
+            chassis.turnToHeading(-90, 500,{.maxSpeed = 70});
+            chassis.moveToPoint(30, 40, 1000,{.forwards = false, .maxSpeed = 90});
+            chassis.waitUntilDone();
+            firstStage.move(127);
+            upperIntake.move(-127);
+            pros::delay(500);
+            firstStage.move(-127);
+            pros::delay(250);
+            firstStage.move(127);
+            pros::delay(1000);
+            upperIntake.move(-127);
+            firstStage.move(-127);
+            tongue.set_value(false); 
+            //orient
+            chassis.moveToPoint(10, 40, 1000, {.maxSpeed = 70});
+            chassis.turnToHeading(-173, 500);
+            chassis.moveToPoint(10, 20, 1000, {.maxSpeed = 70});
+            chassis.waitUntilDone();
+            chassis.turnToHeading(90, 500);
+            chassis.moveToPoint(85, 25, 2500);
+            //turn and pick up
+            chassis.turnToHeading(0,500);
+            chassis.waitUntilDone();
+            chassis.moveToPoint(85, 43, 1000, {.maxSpeed = 70});
+            chassis.turnToHeading(90, 500);
+            firstStage.move(127);
+            upperIntake.move(0);
+            tongue.set_value(true);
+            chassis.waitUntilDone();
+            //chassis.moveToPoint(90, 40, 1000, {.maxSpeed = 70});
+            //chassis.waitUntilDone();
+            //chassis.turnToHeading(90, 750);
+            chassis.moveToPoint(105, 43, 3500, {.maxSpeed = 50});
+            chassis.waitUntilDone();
+            chassis.turnToHeading(90, 500);
+            chassis.waitUntilDone();
+            firstStage.move(0);
+            chassis.moveToPoint(60, 40, 1000, {.forwards = false, .maxSpeed = 90});
+            chassis.waitUntilDone();
+            firstStage.move(127);
+            upperIntake.move(-127);
+            pros::delay(1000);
+            firstStage.move(-127);
+            pros::delay(250);
+            firstStage.move(127);
+            pros::delay(2000);
+            tongue.set_value(false);
+            upperIntake.move(-127);
+            firstStage.move(-127);
+            //move to third quad
+            tongue.set_value(false);
+            chassis.setPose(60,39,90);
+            chassis.moveToPoint(70, 40, 1000, {.maxSpeed = 70});
+            chassis.waitUntilDone();
+            chassis.turnToHeading(180, 750);
+            chassis.waitUntilDone();
+            chassis.moveToPoint(80, -50, 2500, {.maxSpeed = 100});
+            chassis.waitUntilDone();
+            chassis.turnToHeading(90, 500);
+            chassis.waitUntilDone();
+            //dump
+            tongue.set_value(true);
+            firstStage.move(127);
+            upperIntake.move(0);
+            chassis.moveToPoint(89, -50, 3000, {.maxSpeed = 50});
+            chassis.turnToHeading(90, 500);
+            chassis.waitUntilDone();
+            firstStage.move(0);
+            chassis.waitUntilDone();
+            chassis.moveToPoint(55, -40, 2000, {.forwards = false, .maxSpeed = 70});
+            chassis.waitUntilDone();
+            firstStage.move(127);
+            upperIntake.move(-127);
+            pros::delay(1000);
+            firstStage.move(-127);
+            pros::delay(250);
+            firstStage.move(127);
+            pros::delay(2000);
+            upperIntake.move(-127);
+            tongue.set_value(false);
+            firstStage.move(-127);
+            //mov3 4th quad
+            chassis.moveToPoint(70, -55, 1000);
+            chassis.waitUntilDone();
+            chassis.turnToHeading(0,500);
+            chassis.waitUntilDone();
+            chassis.moveToPoint(70, -20, 1000);
+            chassis.waitUntilDone();
+            chassis.turnToHeading(-90,500);
+            chassis.waitUntilDone();
+            chassis.moveToPoint(-5, -20, 2500);
+            chassis.waitUntilDone();
+
+            chassis.turnToHeading(180,500);
+            chassis.waitUntilDone();
+            chassis.moveToPoint(-5, -55, 1000);
+            chassis.waitUntilDone();
+            chassis.turnToHeading(-90,500);
+            tongue.set_value(true);
+            firstStage.move(127);
+            upperIntake.move(-127); // (if doing park keep, if scoring then comment out)
+            chassis.waitUntilDone();
+            chassis.moveToPoint(-26, -56, 3000, {.maxSpeed = 50});
+            chassis.waitUntilDone();
+            // park
+            firstStage.move(-127);
+            chassis.moveToPoint(-10, -57, 1000, {.forwards = false});
+            chassis.waitUntilDone();
+            tongue.set_value(false);
+            firstStage.move(127);
+            chassis.turnToHeading(-60, 500);
+            chassis.moveToPoint(-37, -5, 3000);
+
+            // // score in goal (only use as backup if park no work)
+            // chassis.moveToPoint(10, -57, 2000, {.forwards=false});
+            // chassis.waitUntilDone();
+            // upperIntake.move(-127);
+            // pros::delay(1000);
+            // firstStage.move(-127);
+            // pros::delay(250);
+            // firstStage.move(127);
+            // pros::delay(2000);
+            // upperIntake.move(0);
+            break;
+        case 6:
+            chassis.setPose(0,0,0);
+            chassis.moveToPoint(0, 38, 2000, {.maxSpeed = 70});
+            chassis.turnToHeading(90, 1000, {.maxSpeed = 80});
+            
+            tongue.set_value(true);
+            pros::delay(750);
+            firstStage.move(127);
+            chassis.moveToPoint(10, 38, 1000,{.maxSpeed = 50});
+            chassis.turnToHeading(90, 500);
+            chassis.moveToPoint(-30, 40, 2000,{.forwards = false, .maxSpeed = 90});
+            chassis.waitUntilDone();
+            upperIntake.move(-127);
+             pros::delay(3000);
+            chassis.moveToPoint(8, 40, 1000,{.maxSpeed = 50});
+            chassis.moveToPoint(-30, 40, 2000,{.forwards = false, .maxSpeed = 90});
+            break;
+        case 7:
+            chassis.setPose(0,0,0);
+            chassis.moveToPoint(0, 38, 2000, {.maxSpeed = 70});
+            chassis.turnToHeading(-90, 1000, {.maxSpeed = 80});
+            
+            tongue.set_value(true);
+            pros::delay(1250);
+            firstStage.move(127);
+            chassis.moveToPoint(-12, 38, 700,{.maxSpeed = 50});
+            chassis.turnToHeading(-90, 500);
+            chassis.moveToPoint(30, 40, 1000,{.forwards = false, .maxSpeed = 90});
+            chassis.waitUntilDone();
+            upperIntake.move(-127);
+            pros::delay(2500);
+            upperIntake.move(0);
+            chassis.waitUntilDone();
+            tongue.set_value(false);
+            chassis.moveToPoint(0, 40, 1000,{.maxSpeed = 70});
+            chassis.turnToHeading(133, 500,{.maxSpeed = 80});
+            chassis.moveToPoint(25, 15, 1600,{.maxSpeed = 60});
+            chassis.waitUntilDone();
+            tongue.set_value(true); 
+            pros::delay(500);
+            //dump 2nd batch
+            chassis.moveToPoint(0, 44, 1000,{.forwards = false, .maxSpeed = 70});
+            chassis.turnToHeading(-90, 500,{.maxSpeed = 70});
+            chassis.moveToPoint(30, 40, 1000,{.forwards = false, .maxSpeed = 90});
+            chassis.waitUntilDone();
+
+            firstStage.move(127);
+            upperIntake.move(-127);
+            
+        break;
     }
+    
 }
 
 void opcontrol() {
     bool tongueOut = false;
+    bool wingsOut = false;
 
     // loop forever
     while (true) {
@@ -177,18 +422,19 @@ void opcontrol() {
 
 		leftMotors.move(expL);
         rightMotors.move(expR);
-
+        
 		// intake
 		if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_R1)) { // score on high goal
 			firstStage.move(127);
-			upperIntake.move(-127);
-		} else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_L1)) { // score on mid goal
+			upperIntake.move(-127); 
+		} else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_R2)) { // first stage only intake
 			firstStage.move(127);
-			upperIntake.move(127);
-		}  else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_R2)) { // first stage only intake
+		} else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_UP)) { // first stage only intake
 			firstStage.move(127);
-		} else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_L2)) { // first stage only extake
+            upperIntake.move(-90);
+		}else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_L2)) { // first stage only extake
 			firstStage.move(-127);
+            upperIntake.move(127);
 		} else { // stop both
 			firstStage.move(0);
 			upperIntake.move(0);
@@ -198,6 +444,12 @@ void opcontrol() {
 			tongueOut = !tongueOut;
 			pros::delay(250);
 			tongue.set_value(tongueOut);
+		}
+
+        if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_L1)) {
+			wingsOut = !wingsOut;
+			pros::delay(250);
+			wings.set_value(wingsOut);
 		}
 
         // delay to save resources
